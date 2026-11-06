@@ -1,0 +1,30 @@
+# Konfigurasi dan rahasia lokal. .env.example sengaja tetap dilacak sebagai templat.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Lingkungan virtual
+.venv/
+venv/
+
+# Artefak uji dan alat bantu
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editor dan sistem operasi
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+*.log
