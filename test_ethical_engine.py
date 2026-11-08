@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import config
-from config import KonfigurasiEtika, KonfigurasiTidakValid
+from config import KonfigurasiCors, KonfigurasiEtika, KonfigurasiTidakValid
 from main import app
 
 client = TestClient(app)
@@ -356,3 +356,78 @@ def test_analisis_menolak_input_tidak_valid(ubah):
 )
 def test_batch_menolak_input_tidak_valid(payload):
     assert client.post("/analisis-batch", json=payload).status_code == 422
+
+
+ORIGIN_LOVABLE = "https://id-preview--abc123.lovable.app"
+
+
+def preflight(origin, metode="POST"):
+    return client.options(
+        "/analisis-batch",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": metode,
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [ORIGIN_LOVABLE, "https://abc.lovableproject.com", "https://lovable.app", "http://localhost:5173"],
+)
+def test_cors_origin_yang_diizinkan(origin):
+    r = preflight(origin)
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == origin
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://situs-asing.example",
+        "https://lovable.app.penipu.example",  # nama domain meniru, bukan subdomain sungguhan
+        "http://abc.lovable.app",  # skema bukan https
+    ],
+)
+def test_cors_origin_asing_ditolak(origin):
+    r = preflight(origin)
+    assert r.status_code == 400
+    assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_method_di_luar_get_post_ditolak():
+    assert preflight(ORIGIN_LOVABLE, metode="DELETE").status_code == 400
+
+
+def test_cors_respons_biasa_membawa_header_origin():
+    r = client.get("/health", headers={"Origin": ORIGIN_LOVABLE})
+    assert r.headers["access-control-allow-origin"] == ORIGIN_LOVABLE
+
+
+def test_cors_tanpa_origin_tidak_menambah_header():
+    assert "access-control-allow-origin" not in client.get("/health").headers
+
+
+def test_cors_env_dipisah_per_koma_dan_dirapikan(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://a.example, https://b.example ,")
+    assert KonfigurasiCors.dari_env().origins == ("https://a.example", "https://b.example")
+
+
+def test_cors_regex_kosong_mematikan_pencocokan_pola(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOW_ORIGIN_REGEX", "")
+    assert KonfigurasiCors.dari_env().origin_regex is None
+
+
+def test_cors_regex_tidak_valid_ditolak(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOW_ORIGIN_REGEX", "([")
+    with pytest.raises(KonfigurasiTidakValid, match="CORS_ALLOW_ORIGIN_REGEX"):
+        KonfigurasiCors.dari_env()
+
+
+def test_cors_bawaan_dipakai_bila_variabel_tidak_diatur(tanpa_berkas_env, monkeypatch):
+    monkeypatch.delenv("CORS_ALLOW_ORIGINS", raising=False)
+    monkeypatch.delenv("CORS_ALLOW_ORIGIN_REGEX", raising=False)
+    k = KonfigurasiCors.dari_env()
+    assert "http://localhost:5173" in k.origins
+    assert k.origin_regex is not None and "lovable" in k.origin_regex

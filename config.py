@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from dataclasses import dataclass, fields
 from pathlib import Path
 
@@ -93,3 +94,37 @@ class KonfigurasiEtika:
         # menang atas berkas, sehingga .env hanya menjadi cadangan lokal.
         load_dotenv(ENV_PATH, override=False)
         return cls(**{f.name: _ambil_angka(f.name.upper()) for f in fields(cls)})
+
+
+# Berbeda dari parameter kebijakan di atas, CORS punya nilai bawaan: ia
+# pengaturan lingkungan, bukan keputusan etis, dan bawaan kosong hanya membuat
+# frontend terblokir tanpa petunjuk. Bawaannya sengaja sempit (pengembangan
+# lokal dan domain Lovable), bukan "*".
+_CORS_ORIGINS_BAWAAN = "http://localhost:5173,http://localhost:8080,http://127.0.0.1:5173"
+_CORS_REGEX_BAWAAN = r"https://([a-z0-9-]+\.)*(lovable\.app|lovableproject\.com)"
+
+
+@dataclass(frozen=True)
+class KonfigurasiCors:
+    origins: tuple[str, ...]
+    origin_regex: str | None
+
+    @classmethod
+    def dari_env(cls) -> KonfigurasiCors:
+        load_dotenv(ENV_PATH, override=False)
+        origins = tuple(
+            o.strip()
+            for o in os.environ.get("CORS_ALLOW_ORIGINS", _CORS_ORIGINS_BAWAAN).split(",")
+            if o.strip()
+        )
+        # String kosong sengaja berarti "matikan regex"; hanya variabel yang
+        # benar-benar tidak ada yang jatuh ke nilai bawaan.
+        regex = os.environ.get("CORS_ALLOW_ORIGIN_REGEX", _CORS_REGEX_BAWAAN).strip() or None
+        if regex is not None:
+            try:
+                re.compile(regex)
+            except re.error as galat:
+                raise KonfigurasiTidakValid(
+                    f"CORS_ALLOW_ORIGIN_REGEX bukan regex yang valid: {galat}"
+                ) from None
+        return cls(origins=origins, origin_regex=regex)

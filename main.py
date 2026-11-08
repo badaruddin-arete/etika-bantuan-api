@@ -10,13 +10,15 @@ pertama tentang seseorang dibuat.
 from dataclasses import asdict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from config import KonfigurasiEtika
+from config import KonfigurasiCors, KonfigurasiEtika
 from models.allocator import PengalokasiAnggaran
 from models.ethical_engine import MesinEtika
 from schemas import BatchInput, HasilAnalisis, HasilBatch, PemohonInput
 
 konfigurasi = KonfigurasiEtika.dari_env()
+cors = KonfigurasiCors.dari_env()
 mesin = MesinEtika(konfigurasi)
 pengalokasi = PengalokasiAnggaran(mesin)
 
@@ -28,6 +30,17 @@ app = FastAPI(
         "kerangka etika: Utilitarianisme (Bentham) dan Deontologi (Kant). "
         "Kewajiban Kant mendahului kalkulus kemanfaatan Bentham."
     ),
+)
+
+# Browser memblokir halaman dari asal lain yang memanggil API ini kecuali
+# diizinkan eksplisit. Tanpa cookie atau autentikasi, allow_credentials sengaja
+# dibiarkan mati; method dan header dibatasi pada yang benar-benar dipakai frontend.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(cors.origins),
+    allow_origin_regex=cors.origin_regex,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
