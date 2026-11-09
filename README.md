@@ -1,4 +1,6 @@
 # API Etika Seleksi Bantuan Sosial
+
+![tests](https://github.com/badaruddin-arete/etika-bantuan-api/actions/workflows/tests.yml/badge.svg)
 **Demo antarmuka:** https://etika-bantuan-demo.lovable.app (kode: https://github.com/badaruddin-arete/etika-bantuan-web)
 
 Backend FastAPI yang menganalisis seleksi bantuan sosial dengan dua kerangka etika Barat, lalu menjelaskan alasan setiap keputusan (explainable AI):
